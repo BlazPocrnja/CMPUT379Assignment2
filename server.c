@@ -2,6 +2,7 @@
 ** selectserver.c -- a cheezy multiperson chat server
 ** Link: http://beej.us/guide/bgnet/output/html/multipage/advanced.html#select
 ** Modified by: mwaqar
+** 		Blaz Pocrnja
 */
 
 #include <stdio.h>
@@ -15,7 +16,6 @@
 #include <netdb.h>
 
 #define MY_PORT 2222   // port we're listening on
-
 int main(void)
 {
     fd_set master;    // master file descriptor list
@@ -37,12 +37,14 @@ int main(void)
     FD_ZERO(&master);    // clear the master and temp sets
     FD_ZERO(&read_fds);
 
-	listener = socket(AF_INET, SOCK_STREAM, 0);
+    unsigned char handbuf[2] = {0xCF, 0xA7};	//handshake buffer to send
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
 	
     // get us a socket and bind it
     memset(&sa, 0, sizeof sa);
     sa.sin_family = AF_INET;
-    sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+    sa.sin_addr.s_addr = INADDR_ANY;
     sa.sin_port = htons(MY_PORT);
            
     if (bind(listener, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
@@ -81,6 +83,11 @@ int main(void)
                     if (newfd == -1) {
                         perror("accept");
                     } else {
+			//send handshake to new client
+	                if(send(newfd, handbuf, sizeof(handbuf), 0) == -1){
+				perror("Handshake send failure");
+		        }
+
                         FD_SET(newfd, &master); // add to master set
                         if (newfd > fdmax) {    // keep track of the max
                             fdmax = newfd;
