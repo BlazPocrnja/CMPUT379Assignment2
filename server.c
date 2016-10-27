@@ -14,6 +14,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include<signal.h>
 
 #define MY_PORT 2222   // port we're listening on
 int main(void)
@@ -40,6 +41,7 @@ int main(void)
     unsigned char handbuf[2] = {0xCF, 0xA7};	//handshake buffer to send
     unsigned int clients = 0;
     unsigned int outnum;
+    int pid;
 
     listener = socket(AF_INET, SOCK_STREAM, 0);
 	
@@ -85,23 +87,38 @@ int main(void)
                     if (newfd == -1) {
                         perror("accept");
                     } else {
-			/*---------Inital Handshake Protocol-------------*/
-			//send handshake to new client
-			//we don't have to reorder bytes since we're sending single byte array
-	                if(send(newfd, handbuf, sizeof(handbuf), 0) == -1){
-				perror("Handshake send failure");
-		        }
-			++clients;				//Increment number of clients connected
-			outnum = htonl(clients);		//Change byte order before sending to client
-			send(newfd, &outnum, sizeof(outnum), 0);
 			
-
                         FD_SET(newfd, &master); // add to master set
                         if (newfd > fdmax) {    // keep track of the max
                             fdmax = newfd;
                         }
                         printf("selectserver: new connection from %s:%d on socket %d\n",
-                            inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd);
+                        inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd);
+			++clients;				//Increment number of clients connected
+			
+			//Fork server to do Handshake
+			if ((pid = fork()) == -1){
+			//Fork Error
+				perror("Server could not be forked!");
+				continue;
+        		}
+			else if(pid > 0){
+			//Master
+				continue;
+			}
+			else if(pid == 0){
+			//Child 
+
+				/*---------Initial Handshake Protocol-------------*/
+				//send handshake to new client
+				//we don't have to reorder bytes since we're sending single byte array
+			        if(send(newfd, handbuf, sizeof(handbuf), 0) == -1){
+					perror("Handshake send failure");
+				}
+				outnum = htonl(clients);		//Change byte order before sending to client
+				send(newfd, &outnum, sizeof(outnum), 0);
+				exit(0);				//Exit Child Process
+			}
                     }
                 } else {
                     // handle data from a client
