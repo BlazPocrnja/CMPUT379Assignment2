@@ -38,6 +38,8 @@ int main(void)
     FD_ZERO(&read_fds);
 
     unsigned char handbuf[2] = {0xCF, 0xA7};	//handshake buffer to send
+    unsigned int clients = 0;
+    unsigned int outnum;
 
     listener = socket(AF_INET, SOCK_STREAM, 0);
 	
@@ -83,10 +85,16 @@ int main(void)
                     if (newfd == -1) {
                         perror("accept");
                     } else {
+			/*---------Inital Handshake Protocol-------------*/
 			//send handshake to new client
+			//we don't have to reorder bytes since we're sending single byte array
 	                if(send(newfd, handbuf, sizeof(handbuf), 0) == -1){
 				perror("Handshake send failure");
 		        }
+			++clients;				//Increment number of clients connected
+			outnum = htonl(clients);		//Change byte order before sending to client
+			send(newfd, &outnum, sizeof(outnum), 0);
+			
 
                         FD_SET(newfd, &master); // add to master set
                         if (newfd > fdmax) {    // keep track of the max
@@ -107,6 +115,8 @@ int main(void)
                         }
                         close(i); // bye!
                         FD_CLR(i, &master); // remove from master set
+
+			--clients;		//Decrement number of clients connected
                     } else {
                         // we got some data from a client
                         for(j = 0; j <= fdmax; j++) {

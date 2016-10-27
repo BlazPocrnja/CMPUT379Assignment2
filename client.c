@@ -16,8 +16,9 @@
 
 int main()
 {
-	int	s, number;
+	int	s;
 	unsigned char handbuf[2] = {0};
+	unsigned int clients;
 
 	struct	sockaddr_in	server;
 
@@ -46,12 +47,22 @@ int main()
 		perror ("Client: cannot connect to server");
 		exit (1);
 	}
-
+	
+	//we don't have to reorder bytes since we're recieving single byte array
 	if(recv(s, handbuf, sizeof(handbuf), 0) < 0){
-		perror ("Client: cannot recieve handshake");
+		perror ("Client: cannot receive handshake");
 	}	
 	
 	printf("0x%x 0x%x\n", handbuf[0], handbuf[1]);
+	
+	if(recv(s, &clients, sizeof(clients), 0) < 0){
+		perror ("Client: cannot receive number of clients");
+	}
+	clients = ntohl(clients);
+	printf("Clients: %d\n", clients);
+
+	while(1){
+	}
 
 	/*
 	while (1) {
