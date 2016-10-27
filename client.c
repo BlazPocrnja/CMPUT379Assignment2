@@ -18,7 +18,7 @@ int main()
 {
 	int	s;
 	unsigned char handbuf[2] = {0};
-	unsigned int clients;
+	unsigned short clients;
 
 	struct	sockaddr_in	server;
 
@@ -58,7 +58,7 @@ int main()
 	if(recv(s, &clients, sizeof(clients), 0) < 0){
 		perror ("Client: cannot receive number of clients");
 	}
-	clients = ntohl(clients);
+	clients = ntohs(clients);
 	printf("Clients: %d\n", clients);
 
 	while(1){

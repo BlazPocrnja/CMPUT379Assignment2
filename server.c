@@ -39,9 +39,10 @@ int main(void)
     FD_ZERO(&read_fds);
 
     unsigned char handbuf[2] = {0xCF, 0xA7};	//handshake buffer to send
-    unsigned int clients = 0;
-    unsigned int outnum;
+    unsigned short clients = 0;
+    unsigned short outnum;
     int pid;
+    char*[FD_SETSIZE] names; 			//Array of usernames for each possible file descriptor
 
     listener = socket(AF_INET, SOCK_STREAM, 0);
 	
@@ -94,6 +95,7 @@ int main(void)
                         }
                         printf("selectserver: new connection from %s:%d on socket %d\n",
                         inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd);
+
 			++clients;				//Increment number of clients connected
 			
 			//Fork server to do Handshake
@@ -115,8 +117,15 @@ int main(void)
 			        if(send(newfd, handbuf, sizeof(handbuf), 0) == -1){
 					perror("Handshake send failure");
 				}
-				outnum = htonl(clients);		//Change byte order before sending to client
+				outnum = htons(clients);		//Change byte order before sending to client
 				send(newfd, &outnum, sizeof(outnum), 0);
+				
+				int k;
+				for(k = listener + 1; k < clients; ++k){
+					//Send length of string
+					//Send string contents
+				}				
+				
 				exit(0);				//Exit Child Process
 			}
                     }
