@@ -15,9 +15,11 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include<signal.h>
-#include <sys/mman.h>
+#include <sys/shm.h>
+#include <semaphore.h>
 
 #define MY_PORT 2222   // port we're listening on
+#define MAX_NAME 30   // maximum length of a username
 int main(void)
 {
     fd_set master;    // master file descriptor list
@@ -43,8 +45,31 @@ int main(void)
     unsigned short clients = 0;
     unsigned short outnum;
     int pid;
-    char*names[FD_SETSIZE]; 			//Array of usernames for each possible file descriptor
     char outbyte;
+
+    /* Declare shared memory variables */
+    key_t key; 
+    int shmid;
+    typedef char name[FD_SETSIZE][MAX_NAME];
+    name *usernames;				//Array of usernames for each possible file descriptor
+
+     /* Initialize Shared Memory */
+     key = ftok("server.c",'R');
+     shmid = shmget(key, FD_SETSIZE*MAX_NAME, 0644 | IPC_CREAT);
+
+     /* Attach to Shared Memory */
+     usernames = shmat(shmid, (void *)0, 0);
+     if(usernames == (name *)(-1)){
+     	perror("shmat");
+     }
+
+	//Test with data
+	/*
+	(*usernames)[0][0] = (char)3;
+	(*usernames)[0][1] = 'n';
+	(*usernames)[0][2] = 'e';
+	(*usernames)[0][3] = 'w';
+	*/
 
     listener = socket(AF_INET, SOCK_STREAM, 0);
 	
@@ -124,17 +149,29 @@ int main(void)
 				
 				
 				int k;
+				int l;
 				for(k = 0; k < clients; ++k){
-					//Send length of string
-					outbyte = (char)(strlen(names[k]));
+					//Send length 
+					outbyte = (*usernames)[k][0];
 					send(newfd, &outbyte, sizeof(outbyte), 0);
 
-					//Send string
-					send(newfd, names[k], strlen(names[k]) , 0);
+					//Send array of chars
+					for(l = 1; l <= (int)outbyte; ++l){
+						buf[l - 1] = (*usernames)[k][l];
+					}
+					send(newfd, buf, (int)outbyte, 0);
 				}
+
+				//Recieve New Username length
+				recv(newfd, buf, sizeof(char), 0);
+				//Recieve New Username Chars
+				recv(newfd, &buf[1], (int)buf[0], 0);
+
+				for(k = 0; k <= (int)buf[0]; ++k){
+					(*usernames)[newfd-listener - 1][k] = buf[k];
+				}
+				printf("Stored in  array %d\n" , newfd-listener - 1);
 								
-				printf("%s\n",names[1]);
-				printf("%d\n",strlen(names[1]));
 				exit(0);				//Exit Child Process
 			}
                     }

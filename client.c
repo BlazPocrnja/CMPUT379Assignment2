@@ -62,18 +62,18 @@ int main()
 		perror ("Client: cannot receive number of clients");
 	}
 	clients = ntohs(clients);
-	printf("Clients: %d\n", clients);
+	printf("Clients: %d\n", clients - 1);
 	
 	//Receive list of usernames
-	for(i=0; i < clients; ++i){
+	for(i=0; i < clients - 1; ++i){
 		if(recv(s, &length, sizeof(length), 0) < 0){
-			perror ("Client: cannot recieve length");
+			perror ("Client: cannot receive length");
 		}
 		printf("Length: %d ", length);
 		char name[(int)length];
 		
 		if(recv(s, &name, (int)length, 0) < 0){
-			perror ("Client: cannot recieve Username");
+			perror ("Client: cannot receive Username");
 		}
 		
 		printf("Username: ");
