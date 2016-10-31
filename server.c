@@ -150,7 +150,7 @@ int main(void)
 				
 				int k;
 				int l;
-				for(k = 0; k < clients; ++k){
+				for(k = 0; k < clients-1; ++k){
 					//Send length 
 					outbyte = (*usernames)[k][0];
 					send(newfd, &outbyte, sizeof(outbyte), 0);
@@ -171,7 +171,6 @@ int main(void)
 					(*usernames)[newfd-listener - 1][k] = buf[k];
 				}
 				printf("Stored in  array %d\n" , newfd-listener - 1);
-								
 				exit(0);				//Exit Child Process
 			}
                     }
