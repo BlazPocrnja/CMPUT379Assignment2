@@ -15,6 +15,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include<signal.h>
+#include <sys/mman.h>
 
 #define MY_PORT 2222   // port we're listening on
 int main(void)
@@ -42,7 +43,8 @@ int main(void)
     unsigned short clients = 0;
     unsigned short outnum;
     int pid;
-    char*[FD_SETSIZE] names; 			//Array of usernames for each possible file descriptor
+    char*names[FD_SETSIZE]; 			//Array of usernames for each possible file descriptor
+    char outbyte;
 
     listener = socket(AF_INET, SOCK_STREAM, 0);
 	
@@ -120,12 +122,19 @@ int main(void)
 				outnum = htons(clients);		//Change byte order before sending to client
 				send(newfd, &outnum, sizeof(outnum), 0);
 				
-				int k;
-				for(k = listener + 1; k < clients; ++k){
-					//Send length of string
-					//Send string contents
-				}				
 				
+				int k;
+				for(k = 0; k < clients; ++k){
+					//Send length of string
+					outbyte = (char)(strlen(names[k]));
+					send(newfd, &outbyte, sizeof(outbyte), 0);
+
+					//Send string
+					send(newfd, names[k], strlen(names[k]) , 0);
+				}
+								
+				printf("%s\n",names[1]);
+				printf("%d\n",strlen(names[1]));
 				exit(0);				//Exit Child Process
 			}
                     }

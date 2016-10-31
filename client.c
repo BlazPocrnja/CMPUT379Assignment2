@@ -8,6 +8,7 @@
 #include <strings.h>
 
 #define	 MY_PORT  2222
+#define MAX_NAME 30
 
 /* ---------------------------------------------------------------------
  This is a sample client program for the number server. The client and
@@ -16,9 +17,11 @@
 
 int main()
 {
-	int	s;
+	int	s, i , j;
 	unsigned char handbuf[2] = {0};
+	unsigned char namebuf[MAX_NAME];
 	unsigned short clients;
+	char length;
 
 	struct	sockaddr_in	server;
 
@@ -60,7 +63,46 @@ int main()
 	}
 	clients = ntohs(clients);
 	printf("Clients: %d\n", clients);
+	
+	//Receive list of usernames
+	for(i=0; i < clients; ++i){
+		if(recv(s, &length, sizeof(length), 0) < 0){
+			perror ("Client: cannot recieve length");
+		}
+		printf("Length: %d ", length);
+		char name[(int)length];
+		
+		if(recv(s, &name, (int)length, 0) < 0){
+			perror ("Client: cannot recieve Username");
+		}
+		
+		printf("Username: ");
+		for(j = 0 ; j < (int)length; ++j){
+			printf("%c",name[j]);
+		}
+		printf("\n");
+		
+	}
 
+	//Send new username
+	i= 0;
+	printf("Enter a unique username: ");
+	while((namebuf[i] = getchar()) != '\n' && namebuf[i] != EOF){
+		++i;
+		if(i == MAX_NAME - 1) break;
+	}
+
+	printf("Username: ");
+	for(j = 0 ; j < i; ++j){
+		printf("%c",namebuf[j]);
+	}	
+	printf("\n");
+	
+	length = (char)i;
+
+	send(s, &length, sizeof(length), 0);
+	send(s, &namebuf, (int) length, 0);
+	
 	while(1){
 	}
 
