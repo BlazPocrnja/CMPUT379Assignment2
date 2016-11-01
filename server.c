@@ -162,15 +162,28 @@ int main(void)
 					send(newfd, buf, (int)outbyte, 0);
 				}
 
-				//Recieve New Username length
-				recv(newfd, buf, sizeof(char), 0);
-				//Recieve New Username Chars
-				recv(newfd, &buf[1], (int)buf[0], 0);
+				//Receive New Username length
+				recv(newfd, &outbyte, sizeof(outbyte), 0);
+				printf("Outbyte:%d\n", outbyte);
 
-				for(k = 0; k <= (int)buf[0]; ++k){
-					(*usernames)[newfd-listener - 1][k] = buf[k];
+				//Receive New Username Chars
+				/*size_t total = 0;
+				while(1){
+					total += recv(newfd, buf, (int)outbyte, 0);
+					if(total >= (size_t)outbyte) break;
+				}*/
+				if(recv(newfd, buf, (int)outbyte, 0) < 0)printf("Broke");
+				
+
+				//TODO Check if User already exists
+
+				(*usernames)[newfd-listener - 1][0] = outbyte;
+				for(k = 1; k <= (int)outbyte; ++k){
+					(*usernames)[newfd-listener - 1][k] = buf[k-1];
+					printf("%c",buf[k-1]);
 				}
 				printf("Stored in  array %d\n" , newfd-listener - 1);
+
 				exit(0);				//Exit Child Process
 			}
                     }

@@ -27,7 +27,7 @@ int main()
 
 	struct	hostent		*host;
 
-	host = gethostbyname ("localhost");
+	host = gethostbyname ("localhost");	//TODO change from local host to server address
 
 	if (host == NULL) {
 		perror ("Client: cannot get host description");
@@ -101,7 +101,12 @@ int main()
 	length = (char)i;
 
 	send(s, &length, sizeof(length), 0);
-	send(s, &namebuf, (int) length, 0);
+	
+	size_t total = 0;
+	while(1){
+		total += send(s, namebuf, (int)length, 0);
+		if(total >= (size_t)length) break;
+	}
 	
 	while(1){
 	}
