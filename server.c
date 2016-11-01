@@ -5,21 +5,8 @@
 ** 		Blaz Pocrnja
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include<signal.h>
-#include <sys/shm.h>
-#include <semaphore.h>
+#include "chat.h"
 
-#define MY_PORT 2222   // port we're listening on
-#define MAX_NAME 30   // maximum length of a username
 int main(void)
 {
     fd_set master;    // master file descriptor list
@@ -62,14 +49,6 @@ int main(void)
      if(usernames == (name *)(-1)){
      	perror("shmat");
      }
-
-	//Test with data
-	/*
-	(*usernames)[0][0] = (char)3;
-	(*usernames)[0][1] = 'n';
-	(*usernames)[0][2] = 'e';
-	(*usernames)[0][3] = 'w';
-	*/
 
     listener = socket(AF_INET, SOCK_STREAM, 0);
 	
@@ -151,15 +130,21 @@ int main(void)
 				int k;
 				int l;
 				for(k = 0; k < clients-1; ++k){
-					//Send length 
-					outbyte = (*usernames)[k][0];
-					send(newfd, &outbyte, sizeof(outbyte), 0);
+					//if user is still connected
+					if(FD_ISSET(k+listener+1, &master)){
+						//Send length 
+						outbyte = (*usernames)[k][0];
+						send(newfd, &outbyte, sizeof(outbyte), 0);
 
-					//Send array of chars
-					for(l = 1; l <= (int)outbyte; ++l){
-						buf[l - 1] = (*usernames)[k][l];
+						//Send array of chars
+						for(l = 1; l <= (int)outbyte; ++l){
+							buf[l - 1] = (*usernames)[k][l];
+						}
+						send(newfd, buf, (int)outbyte, 0);
 					}
-					send(newfd, buf, (int)outbyte, 0);
+					else{
+						--k;
+					}
 				}
 
 				//Receive New Username length
@@ -167,12 +152,7 @@ int main(void)
 				printf("Outbyte:%d\n", outbyte);
 
 				//Receive New Username Chars
-				/*size_t total = 0;
-				while(1){
-					total += recv(newfd, buf, (int)outbyte, 0);
-					if(total >= (size_t)outbyte) break;
-				}*/
-				if(recv(newfd, buf, (int)outbyte, 0) < 0)printf("Broke");
+				recv(newfd, buf, (int)outbyte, 0);
 				
 
 				//TODO Check if User already exists

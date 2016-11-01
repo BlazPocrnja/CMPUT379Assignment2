@@ -1,14 +1,4 @@
-#include <sys/types.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <strings.h>
-
-#define	 MY_PORT  2222
-#define MAX_NAME 30
+#include "chat.h"
 
 /* ---------------------------------------------------------------------
  This is a sample client program for the number server. The client and
@@ -20,8 +10,16 @@ int main()
 	int	s, i , j;
 	unsigned char handbuf[2] = {0};
 	unsigned char namebuf[MAX_NAME];
+	char msgbuf[MAX_MSG];
 	unsigned short clients;
 	char length;
+
+	struct timeval tv;
+	tv.tv_sec = 30;
+	
+	fd_set readfds;
+	FD_ZERO(&readfds);
+    	FD_SET(STDIN, &readfds);
 
 	struct	sockaddr_in	server;
 
@@ -101,41 +99,21 @@ int main()
 	length = (char)i;
 
 	send(s, &length, sizeof(length), 0);
-	
-	size_t total = 0;
+	send(s, namebuf, (int)length, 0);
+
+	printf("Chat Away...\n");
 	while(1){
-		total += send(s, namebuf, (int)length, 0);
-		if(total >= (size_t)length) break;
-	}
-	
-	while(1){
-	}
 
-	/*
-	while (1) {
-
-		s = socket (AF_INET, SOCK_STREAM, 0);
-
-		if (s < 0) {
-			perror ("Client: cannot open socket");
-			exit (1);
+		select(STDIN+1, &readfds, NULL, NULL, &tv);
+		if (FD_ISSET(STDIN, &readfds)){
+        		printf("A key was pressed!\n");
 		}
-
-		bzero (&server, sizeof (server));
-		bcopy (host->h_addr, & (server.sin_addr), host->h_length);
-		server.sin_family = host->h_addrtype;
-		server.sin_port = htons (MY_PORT);
-
-		if (connect (s, (struct sockaddr*) & server, sizeof (server))) {
-			perror ("Client: cannot connect to server");
-			exit (1);
+    		else{
+        		printf("Timed out.\n");
 		}
-
-		read (s, &number, sizeof (number));
-		close (s);
-		fprintf (stderr, "Process %d gets number %d\n", getpid (),
-			ntohl (number));
-		sleep (5);
+		close(i); // bye!
+                FD_CLR(i, &master); // remove from master set
+		
 	}
-	*/
+
 }
