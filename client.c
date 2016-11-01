@@ -12,6 +12,7 @@ int main()
 	unsigned char namebuf[MAX_NAME];
 	char msgbuf[MAX_MSG];
 	unsigned short clients;
+	unsigned short msglength;
 	char length;
 
 	struct timeval tv;
@@ -103,16 +104,21 @@ int main()
 
 	printf("Chat Away...\n");
 	while(1){
-
-		select(STDIN+1, &readfds, NULL, NULL, &tv);
-		if (FD_ISSET(STDIN, &readfds)){
-        		printf("A key was pressed!\n");
+		
+		i = 0;
+		while((msgbuf[i] = getchar()) != '\n' && msgbuf[i] != EOF){
+			++i;
+			if(i == MAX_MSG - 1) break;
 		}
-    		else{
-        		printf("Timed out.\n");
-		}
-		close(i); // bye!
-                FD_CLR(i, &master); // remove from master set
+		printf("Message: ");
+		for(j = 0 ; j < i; ++j){
+			printf("%c",msgbuf[j]);
+		}	
+		printf("\n");
+		
+		msglength = htons(i);
+		send(s, &msglength, sizeof(msglength), 0);
+		send(s, msgbuf, (int)msglength, 0);		
 		
 	}
 

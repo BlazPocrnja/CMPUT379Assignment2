@@ -105,16 +105,16 @@ int main(void)
 			++clients;				//Increment number of clients connected
 			
 			//Fork server to do Handshake
-			if ((pid = fork()) == -1){
+			//if ((pid = fork()) == -1){
 			//Fork Error
-				perror("Server could not be forked!");
-				continue;
-        		}
-			else if(pid > 0){
+			//	perror("Server could not be forked!");
+			//	continue;
+        		//}
+			//else if(pid > 0){
 			//Master
-				continue;
-			}
-			else if(pid == 0){
+			//	continue;
+			//}
+			//else if(pid == 0){
 			//Child 
 
 				/*---------Initial Handshake Protocol-------------*/
@@ -129,9 +129,10 @@ int main(void)
 				
 				int k;
 				int l;
-				for(k = 0; k < clients-1; ++k){
+				int clienttmp = clients;
+				for(k = 0; k < clienttmp-1; ++k){
 					//if user is still connected
-					if(FD_ISSET(k+listener+1, &master)){
+					if((*usernames)[k][0] != 0){
 						//Send length 
 						outbyte = (*usernames)[k][0];
 						send(newfd, &outbyte, sizeof(outbyte), 0);
@@ -143,8 +144,9 @@ int main(void)
 						send(newfd, buf, (int)outbyte, 0);
 					}
 					else{
-						--k;
+						clienttmp++;
 					}
+					
 				}
 
 				//Receive New Username length
@@ -164,8 +166,8 @@ int main(void)
 				}
 				printf("Stored in  array %d\n" , newfd-listener - 1);
 
-				exit(0);				//Exit Child Process
-			}
+				//exit(0);				//Exit Child Process
+			//}
                     }
                 } else {
                     // handle data from a client
@@ -179,7 +181,9 @@ int main(void)
                         }
                         close(i); // bye!
                         FD_CLR(i, &master); // remove from master set
-
+			
+			//Nullify UserName
+			(*usernames)[i-listener-1][0] = 0; 
 			--clients;		//Decrement number of clients connected
                     } else {
                         // we got some data from a client

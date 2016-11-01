@@ -10,6 +10,7 @@
 #include<signal.h>
 #include <sys/shm.h>
 #include <semaphore.h>
+#include <time.h>
 #include <sys/time.h>
 
 #define MY_PORT 2222   // port we're listening on
