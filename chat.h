@@ -18,4 +18,38 @@
 #define MAX_MSG 256	//Max length of chat message
 #define STDIN 0  // file descriptor for standard input
 
+//Message Initializers
+#define HAND_1 0xCF
+#define HAND_2 0xA7
+#define CHAT_MSG 0x00
+#define JOIN_MSG 0x01
+#define LEAVE_MSG 0x02
 
+
+ssize_t my_send(int sockfd, const void *buf, size_t len, int flags){
+
+	size_t total = 0;
+
+	while ( total != len ) {
+	    ssize_t nb = send( sockfd, buf + total, len - total, flags);
+	    if ( nb == -1 ) return -1;
+	    total += nb;
+	}
+
+	return total;
+}
+
+
+ssize_t my_recv(int sockfd, void *buf, size_t len, int flags){
+
+	size_t total = 0; 
+
+	while (total != len) {
+	    ssize_t nb = recv( sockfd, buf + total, len - total, flags);
+	    if ( nb == -1 ) return -1;
+	    if (nb == 0) return 0;
+	    total += nb;
+	}
+
+	return total;
+}

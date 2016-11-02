@@ -23,16 +23,17 @@ int main(void)
     int nbytes;
     
     int yes=1;        // for setsockopt() SO_REUSEADDR, below
-    int i, j, rv;
+    int i, j, rv, k, l;
 
     FD_ZERO(&master);    // clear the master and temp sets
     FD_ZERO(&read_fds);
 
-    unsigned char handbuf[2] = {0xCF, 0xA7};	//handshake buffer to send
     unsigned short clients = 0;
     unsigned short outnum;
     int pid;
     char outbyte;
+    char length;
+    unsigned short msglength;
 
     /* Declare shared memory variables */
     key_t key; 
@@ -102,82 +103,60 @@ int main(void)
                         printf("selectserver: new connection from %s:%d on socket %d\n",
                         inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd);
 
-			++clients;				//Increment number of clients connected
+			//---------HANDSHAKE PROTOCOL------------
+
+			//First Two Bytes
+			buf[0] = HAND_1;
+			buf[1] = HAND_2;
+			if(my_send(newfd, buf, 2, 0) != 2){
+				perror("Handshake Bytes not sent!");
+			}
 			
-			//Fork server to do Handshake
-			//if ((pid = fork()) == -1){
-			//Fork Error
-			//	perror("Server could not be forked!");
-			//	continue;
-        		//}
-			//else if(pid > 0){
-			//Master
-			//	continue;
-			//}
-			//else if(pid == 0){
-			//Child 
-
-				/*---------Initial Handshake Protocol-------------*/
-				//send handshake to new client
-				//we don't have to reorder bytes since we're sending single byte array
-			        if(send(newfd, handbuf, sizeof(handbuf), 0) == -1){
-					perror("Handshake send failure");
-				}
-				outnum = htons(clients);		//Change byte order before sending to client
-				send(newfd, &outnum, sizeof(outnum), 0);
-				
-				
-				int k;
-				int l;
-				int clienttmp = clients;
-				for(k = 0; k < clienttmp-1; ++k){
-					//if user is still connected
-					if((*usernames)[k][0] != 0){
-						//Send length 
-						outbyte = (*usernames)[k][0];
-						send(newfd, &outbyte, sizeof(outbyte), 0);
-
-						//Send array of chars
-						for(l = 1; l <= (int)outbyte; ++l){
-							buf[l - 1] = (*usernames)[k][l];
-						}
-						send(newfd, buf, (int)outbyte, 0);
+			//Number of Clients
+			outnum = htons(clients);		//Change byte order before sending to client
+			if(my_send(newfd, &outnum, sizeof(outnum), 0) != 2){
+				perror("Number of clients not sent!");
+			}
+			
+			//Usernames
+			int clienttmp = clients;
+			for(k = 0; k < clienttmp; ++k){
+				//if user is still connected
+				if((*usernames)[k][0] != 0){
+					//Send length 
+					outbyte = (*usernames)[k][0];
+					if(my_send(newfd, &outbyte, sizeof(outbyte), 0) != sizeof(outbyte)){	
+						perror("Length of username not sent!");		
 					}
-					else{
-						clienttmp++;
+
+					//Send array of chars
+					for(l = 1; l <= (int)outbyte; ++l){
+						buf[l - 1] = (*usernames)[k][l];
 					}
-					
+					if(my_send(newfd, buf, (int)outbyte, 0) != (int) outbyte){
+						perror("Username not sent!");
+					}
 				}
-
-				//Receive New Username length
-				recv(newfd, &outbyte, sizeof(outbyte), 0);
-				printf("Outbyte:%d\n", outbyte);
-
-				//Receive New Username Chars
-				recv(newfd, buf, (int)outbyte, 0);
+				else{
+					clienttmp++;
+				}
 				
-
-				//TODO Check if User already exists
-
-				(*usernames)[newfd-listener - 1][0] = outbyte;
-				for(k = 1; k <= (int)outbyte; ++k){
-					(*usernames)[newfd-listener - 1][k] = buf[k-1];
-					printf("%c",buf[k-1]);
-				}
-				printf("Stored in  array %d\n" , newfd-listener - 1);
-
-				//exit(0);				//Exit Child Process
-			//}
+			}
+			
                     }
                 } else {
+	            //TODO FORK DATA HANDLING!!
+
                     // handle data from a client
-                    if ((nbytes = recv(i, buf, sizeof buf, 0)) <= 0) {
+			
+		    //Check if connection closed		
+                    if ((nbytes = my_recv(i, buf, 1, 0)) <= 0) {
                         // got error or connection closed by client
                         if (nbytes == 0) {
                             // connection closed
                             printf("selectserver: socket %d hung up\n", i);
                         } else {
-                            perror("recv");
+                            perror("Could not receive initial byte!");
                         }
                         close(i); // bye!
                         FD_CLR(i, &master); // remove from master set
@@ -185,19 +164,45 @@ int main(void)
 			//Nullify UserName
 			(*usernames)[i-listener-1][0] = 0; 
 			--clients;		//Decrement number of clients connected
+
                     } else {
+			printf("Data Handling");
                         // we got some data from a client
-                        for(j = 0; j <= fdmax; j++) {
-                            // send to everyone!
-                            if (FD_ISSET(j, &master)) {
-                                // except the listener and ourselves
-                                if (j != listener && j != i) {
-                                    if (send(j, buf, nbytes, 0) == -1) {
-                                        perror("send");
-                                    }
-                                }
-                            }
-                        }
+			if((*usernames)[i-listener-1][0] == 0){			//Username Message	
+
+				//---------Continue Handshake Protocol---------------
+				length = buf[0];
+
+				//Receive New Username Chars
+				if(my_recv(i, buf, (int)length, 0) != (int) length){
+					perror("Could not receive new username!");
+				}
+				
+				//TODO Check if Username already exists
+				
+				//Store in usernames array
+				(*usernames)[i-listener - 1][0] = length;
+				for(k = 1; k <= (int)length; ++k){
+					(*usernames)[i-listener - 1][k] = buf[k-1];
+					printf("%c",buf[k-1]);
+				}
+				printf("Stored in  array %d\n" , newfd-listener - 1);		
+				++clients;				//Increment number of clients connected
+			}
+			else{							//Chat Message
+				//TODO Handle Client messages
+				for(j = 0; j <= fdmax; j++) {
+		                    // send to everyone!
+		                    if (FD_ISSET(j, &master)) {
+		                        // except the listener and ourselves
+		                        if (j != listener && j != i) {
+		                            if (send(j, buf, nbytes, 0) == -1) {
+		                                perror("send");
+		                            }
+		                        }
+		                    }
+		                }
+			}
                     }
                 } // END handle data from client
             } // END got new incoming connection
