@@ -166,15 +166,16 @@ int main(void)
 			--clients;		//Decrement number of clients connected
 		
 			
-			//Put name in buffer			
+			//Save length		
 			length = (*usernames)[i-listener-1][0];
-			for(k = 1; k <= (int)length; ++k){
+			//Nullify UserName
+			(*usernames)[i-listener-1][0] = 0; 
+		
+			//Put username in buffer
+			for(k = 1; k < (int)length; ++k){
 				buf[k-1] = (*usernames)[i-listener - 1][k];
 			}
 
-			//Nullify UserName
-			(*usernames)[i-listener-1][0] = 0; 
-			
 			outbyte = LEAVE_MSG;
 
 			//Forward disconnection to all clients						
