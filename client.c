@@ -2,7 +2,7 @@
 
 /* ---------------------------------------------------------------------
  This is a sample client program for the number server. The client and
- the server need not run on the same machine.				 
+ the server need not run on the same machine.
  --------------------------------------------------------------------- */
 
 int main()
@@ -17,7 +17,7 @@ int main()
 
 	struct timeval tv;
 	tv.tv_sec = 30;
-	
+
 	fd_set readfds;
 	FD_ZERO(&readfds);
     	FD_SET(STDIN, &readfds);
@@ -32,7 +32,7 @@ int main()
 		perror ("Client: cannot get host description");
 		exit (1);
 	}
-	
+
 	s = socket (AF_INET, SOCK_STREAM, 0);
 
 	if (s < 0) {
@@ -49,38 +49,38 @@ int main()
 		perror ("Client: cannot connect to server");
 		exit (1);
 	}
-	
+
 	//we don't have to reorder bytes since we're recieving single byte array
-	if(recv(s, handbuf, sizeof(handbuf), 0) < 0){
+	if(my_recv(s, handbuf, sizeof(handbuf), 0) < 0){
 		perror ("Client: cannot receive handshake");
-	}	
-	
+	}
+
 	printf("0x%x 0x%x\n", handbuf[0], handbuf[1]);
-	
-	if(recv(s, &clients, sizeof(clients), 0) < 0){
+
+	if(my_recv(s, &clients, sizeof(clients), 0) < 0){
 		perror ("Client: cannot receive number of clients");
 	}
 	clients = ntohs(clients);
-	printf("Clients: %d\n", clients - 1);
-	
+	printf("Clients: %d\n", clients);
+
 	//Receive list of usernames
-	for(i=0; i < clients - 1; ++i){
-		if(recv(s, &length, sizeof(length), 0) < 0){
+	for(i=0; i < clients; ++i){
+		if(my_recv(s, &length, sizeof(length), 0) < 0){
 			perror ("Client: cannot receive length");
 		}
 		printf("Length: %d ", length);
 		char name[(int)length];
-		
-		if(recv(s, &name, (int)length, 0) < 0){
+
+		if(my_recv(s, &name, (int)length, 0) < 0){
 			perror ("Client: cannot receive Username");
 		}
-		
+
 		printf("Username: ");
 		for(j = 0 ; j < (int)length; ++j){
 			printf("%c",name[j]);
 		}
 		printf("\n");
-		
+
 	}
 
 	//Send new username
@@ -94,32 +94,94 @@ int main()
 	printf("Username: ");
 	for(j = 0 ; j < i; ++j){
 		printf("%c",namebuf[j]);
-	}	
+	}
 	printf("\n");
-	
+
 	length = (char)i;
 
-	send(s, &length, sizeof(length), 0);
-	send(s, namebuf, (int)length, 0);
+	my_send(s, &length, sizeof(length), 0);
+	my_send(s, namebuf, (int)length, 0);
 
 	printf("Chat Away...\n");
-	while(1){
-		
-		i = 0;
-		while((msgbuf[i] = getchar()) != '\n' && msgbuf[i] != EOF){
-			++i;
-			if(i == MAX_MSG - 1) break;
-		}
-		printf("Message: ");
-		for(j = 0 ; j < i; ++j){
-			printf("%c",msgbuf[j]);
-		}	
-		printf("\n");
-		
-		msglength = htons(i);
-		send(s, &msglength, sizeof(msglength), 0);
-		send(s, msgbuf, (int)msglength, 0);		
-		
-	}
+
+	pid_t chid;
+
+	chid = fork(); // Fork to have two loops, one for sending messages, one for receiving.
+
+    if (chid != 0) //Executed by parent
+    {
+        while(1)
+        {
+            i = 0;
+            while((msgbuf[i] = getchar()) != '\n' && msgbuf[i] != EOF)
+            {
+                ++i;
+                if(i == MAX_MSG - 1) break;
+            }
+	
+	    msglength = (short)i;
+	    msglength = htons(msglength);
+            my_send(s, &msglength, sizeof(msglength), 0);
+
+            printf("Message: ");
+            for(j = 0 ; j < i; ++j)
+            {
+                printf("%c",msgbuf[j]);
+            }
+            printf("\n");
+
+            msglength = ntohs(msglength);
+            my_send(s, msgbuf, msglength, 0);
+
+        }
+    }
+
+    char msg_type;
+    uint16_t msg_userlength;
+    unsigned short convert; // convert as storage for ntos()
+    char msg_username[MAX_NAME];
+    uint16_t msg_msglength;
+    char msg_msg[100];
+
+    if (chid == 0)
+    {
+        printf("Working\n");
+
+        while(1)
+        {
+            // Get message type
+            my_recv(s, &msg_type, 1, 0);
+
+            if (msg_type == CHAT_MSG)
+            {
+                // Get username
+                my_recv(s, &length, sizeof(length), 0);     
+                my_recv(s, msg_username, (int) length, 0);
+		msg_username[(int) length] = '\0';
+
+                // Get message
+                my_recv(s, &convert, sizeof(convert), 0);     
+		convert = ntohs(convert);
+                my_recv(s, msgbuf, convert, 0);
+		msgbuf[convert] = '\0';
+                printf("%s:%s\n", msg_username, msgbuf);
+            }
+
+
+            else if (msg_type == JOIN_MSG)
+            {
+                //incomplete
+            }
+
+            else if (msg_type == LEAVE_MSG)
+            {
+                //incomplete
+            }
+
+            sleep(1);
+        }
+
+    }
 
 }
+
