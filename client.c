@@ -51,13 +51,13 @@ int main()
 	}
 
 	//we don't have to reorder bytes since we're recieving single byte array
-	if(recv(s, handbuf, sizeof(handbuf), 0) < 0){
+	if(my_recv(s, handbuf, sizeof(handbuf), 0) < 0){
 		perror ("Client: cannot receive handshake");
 	}
 
 	printf("0x%x 0x%x\n", handbuf[0], handbuf[1]);
 
-	if(recv(s, &clients, sizeof(clients), 0) < 0){
+	if(my_recv(s, &clients, sizeof(clients), 0) < 0){
 		perror ("Client: cannot receive number of clients");
 	}
 	clients = ntohs(clients);
@@ -65,13 +65,13 @@ int main()
 
 	//Receive list of usernames
 	for(i=0; i < clients; ++i){
-		if(recv(s, &length, sizeof(length), 0) < 0){
+		if(my_recv(s, &length, sizeof(length), 0) < 0){
 			perror ("Client: cannot receive length");
 		}
 		printf("Length: %d ", length);
 		char name[(int)length];
 
-		if(recv(s, &name, (int)length, 0) < 0){
+		if(my_recv(s, &name, (int)length, 0) < 0){
 			perror ("Client: cannot receive Username");
 		}
 
@@ -99,8 +99,8 @@ int main()
 
 	length = (char)i;
 
-	send(s, &length, sizeof(length), 0);
-	send(s, namebuf, (int)length, 0);
+	my_send(s, &length, sizeof(length), 0);
+	my_send(s, namebuf, (int)length, 0);
 
 	printf("Chat Away...\n");
 
@@ -118,26 +118,28 @@ int main()
                 ++i;
                 if(i == MAX_MSG - 1) break;
             }
+	
+	    msglength = (short)i;
+	    msglength = htons(msglength);
+            my_send(s, &msglength, sizeof(msglength), 0);
 
             printf("Message: ");
-
             for(j = 0 ; j < i; ++j)
             {
                 printf("%c",msgbuf[j]);
             }
             printf("\n");
 
-            msglength = htons(i);
-            send(s, &msglength, sizeof(msglength), 0);
-            send(s, msgbuf, (int)msglength, 0);
+            msglength = ntohs(msglength);
+            my_send(s, msgbuf, msglength, 0);
 
         }
     }
 
     char msg_type;
     uint16_t msg_userlength;
-    uint16_t convert; // convert as storage for ntos()
-    char msg_username[30];
+    unsigned short convert; // convert as storage for ntos()
+    char msg_username[MAX_NAME];
     uint16_t msg_msglength;
     char msg_msg[100];
 
@@ -148,19 +150,21 @@ int main()
         while(1)
         {
             // Get message type
-            recv(s, &msg_type, 1, 0);
+            my_recv(s, &msg_type, 1, 0);
 
             if (msg_type == CHAT_MSG)
             {
                 // Get username
-                recv(s, &convert, 2, 0);     msg_userlength = ntohs(convert);
-                recv(s, msg_username, msg_userlength, 0);
+                my_recv(s, &length, sizeof(length), 0);     
+                my_recv(s, msg_username, (int) length, 0);
+		msg_username[(int) length] = '\0';
 
                 // Get message
-                recv(s, &convert, 2, 0);     msg_msglength = ntohs(convert);
-                recv(s, msg_msg, msg_msglength, 0);
-
-                printf("%s: %s\n", msg_username, msg_msg);
+                my_recv(s, &convert, sizeof(convert), 0);     
+		convert = ntohs(convert);
+                my_recv(s, msgbuf, convert, 0);
+		msgbuf[convert] = '\0';
+                printf("%s:%s\n", msg_username, msgbuf);
             }
 
 

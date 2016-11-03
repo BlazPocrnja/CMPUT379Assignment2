@@ -143,6 +143,7 @@ int main(void)
 				}
 				
 			}
+			(*usernames)[newfd-listener-1][0] = 0; //Nullify username
 			
                     }
                 } else {
@@ -204,21 +205,24 @@ int main(void)
 				if(my_recv(i, buf, msglength, 0) != msglength){
 					perror("Could not receive chat message!");
 				}
+				printf("Message :");
+				for(k = 0; k < msglength; ++k){
+					printf("%c",buf[k]);
+				}
+				printf("\n");
+
 				//Forward to all clients						
-				for(j = 0; j <= fdmax; j++) {
+				for(j = listener + 1; j <= fdmax; j++) {
 		                    // send if name has been selected
 		                    if (FD_ISSET(j, &master) && (*usernames)[i-listener-1][0] != 0) {
-		                        // except the listener
-		                        if (j != listener) {
-
 					    //Send Message Code
 					    outbyte = CHAT_MSG;
-		                            if (my_send(j, &outbyte, sizeof(outbyte), 0) != sizeof(outbyte)) {
-		                                printf("Chat message code not sent to FD %d", j);
-		                            }
+			                    if (my_send(j, &outbyte, sizeof(outbyte), 0) != sizeof(outbyte)) {
+			                        printf("Chat message code not sent to FD %d", j);
+			                    }
 					    //Send Client info
 					    length = (*usernames)[i-listener-1][0];
-					    for(k = 0; k <= ((int)length) + 1; ++k){
+					    for(k = 0; k <= ((int)length); ++k){
 							tmpname[k] = (*usernames)[i-listener-1][k];
 					    }
 					    if(my_send(j, tmpname, ((int)length) + 1, 0) != ((int)length) + 1){
@@ -227,14 +231,12 @@ int main(void)
 					    //Send Message Length
 					    unsigned short tmp = htons(msglength);
 					    if (my_send(j, &tmp, sizeof(tmp), 0) != sizeof(tmp)) {
-		                                 printf("Chat message length not sent to FD %d", j);
-		                            }
+			                         printf("Chat message length not sent to FD %d", j);
+			                    }
 					    //Send Message
 					    if (my_send(j, buf, msglength, 0) != msglength) {
-		                                 printf("Chat message not sent to FD %d", j);
-		                            }
-					
-		                        }
+			                         printf("Chat message not sent to FD %d", j);
+			                    }
 		                    }
 		                }
 			}
