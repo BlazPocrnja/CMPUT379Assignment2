@@ -180,7 +180,7 @@ int main(void)
 			//Forward disconnection to all clients						
 			for(j = listener + 1; j <= fdmax; j++) {
 	                    	// send if name has been set
-	                    	if (FD_ISSET(j, &master) && (*usernames)[i-listener-1][0] != 0) {
+	                    	if (FD_ISSET(j, &master) && (*usernames)[j-listener-1][0] != 0) {
 
 					//Send User Update Message: Leave
 					if(my_send(j, &outbyte, 1, 0) != 1){
@@ -223,7 +223,7 @@ int main(void)
 				//Forward new connection to all clients						
 				for(j = listener + 1; j <= fdmax; j++) {
 		                    	// send if name has been set
-		                    	if (FD_ISSET(j, &master) && (*usernames)[i-listener-1][0] != 0) {
+		                    	if (FD_ISSET(j, &master) && (*usernames)[j-listener-1][0] != 0) {
 
 						//Send User Update Message: Join
 						if(my_send(j, &outbyte, 1, 0) != 1){
@@ -262,7 +262,7 @@ int main(void)
 				//Forward to all clients						
 				for(j = listener + 1; j <= fdmax; j++) {
 		                    // send if name has been set
-		                    if (FD_ISSET(j, &master) && (*usernames)[i-listener-1][0] != 0) {
+		                    if (FD_ISSET(j, &master) && (*usernames)[j-listener-1][0] != 0) {
 					    //Send Message Code
 					    outbyte = CHAT_MSG;
 			                    if (my_send(j, &outbyte, sizeof(outbyte), 0) != sizeof(outbyte)) {
