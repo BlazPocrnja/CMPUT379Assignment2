@@ -197,8 +197,6 @@ int main()
 
                 printf("%s has disconnected\n",msg_username);
             }
-
-            sleep(1);
         }
 
     }

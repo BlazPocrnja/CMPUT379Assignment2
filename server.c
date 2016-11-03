@@ -35,6 +35,7 @@ int main(void)
     char length;
     unsigned short msglength;
     char tmpname[MAX_NAME];
+    typedef enum { false, true } bool;
 
     /* Declare shared memory variables */
     key_t key;
@@ -256,47 +257,78 @@ int main(void)
                             {
                                 perror("Could not receive new username!");
                             }
+			    
+                            //Check if Username already exists
+			    bool exists = false;
+			    for(j = 0; j <= fdmax - listener - 1; ++j)
+			    {
+			    	if(length == (*usernames)[j][0])
+				{
+					for(k = 1; k < (int) length; ++k)
+					{
+						if(buf[k-1] != (*usernames)[j][k])
+						{
+							exists = false;
+							break;
+						}
+						else
+						{
+							exists = true;
+						}
+								
+					}
+				}
+				if(exists == true) break;
+			    }
+				
+			    if(!exists)
+			    {
+		                    //Store in usernames array
+		                    (*usernames)[i-listener - 1][0] = length;
 
-                            //TODO Check if Username already exists
+		                    for(k = 1; k <= (int)length; ++k)
+		                    {
+		                        (*usernames)[i-listener - 1][k] = buf[k-1];
+		                        printf("%c",buf[k-1]);
+		                    }
 
-                            //Store in usernames array
-                            (*usernames)[i-listener - 1][0] = length;
+		                    printf("Stored in array %d\n", newfd-listener - 1);
+		                    ++clients;				//Increment number of clients connected
 
-                            for(k = 1; k <= (int)length; ++k)
-                            {
-                                (*usernames)[i-listener - 1][k] = buf[k-1];
-                                printf("%c",buf[k-1]);
-                            }
+		                    outbyte = JOIN_MSG;
 
-                            printf("Stored in array %d\n", newfd-listener - 1);
-                            ++clients;				//Increment number of clients connected
+		                    //Forward new connection to all clients
+		                    for(j = listener + 1; j <= fdmax; j++)
+		                    {
+		                        // send if name has been set
+		                        if (FD_ISSET(j, &master) && (*usernames)[j-listener-1][0] != 0)
+		                        {
 
-                            outbyte = JOIN_MSG;
+		                            //Send User Update Message: Join
+		                            if(my_send(j, &outbyte, 1, 0) != 1)
+		                            {
+		                                printf("Could not send connection message to %d\n", j);
+		                            }
 
-                            //Forward new connection to all clients
-                            for(j = listener + 1; j <= fdmax; j++)
-                            {
-                                // send if name has been set
-                                if (FD_ISSET(j, &master) && (*usernames)[j-listener-1][0] != 0)
-                                {
+		                            if(my_send(j, &length, 1, 0) != 1)
+		                            {
+		                                printf("Could not send connection length to %d\n", j);
+		                            }
 
-                                    //Send User Update Message: Join
-                                    if(my_send(j, &outbyte, 1, 0) != 1)
-                                    {
-                                        printf("Could not send connection message to %d\n", j);
-                                    }
-
-                                    if(my_send(j, &length, 1, 0) != 1)
-                                    {
-                                        printf("Could not send connection length to %d\n", j);
-                                    }
-
-                                    if(my_send(j, buf, (int)length, 0) != (int) length)
-                                    {
-                                        printf("Could not send connection username to %d\n", j);
-                                    }
-                                }
-                            }
+		                            if(my_send(j, buf, (int)length, 0) != (int) length)
+		                            {
+		                                printf("Could not send connection username to %d\n", j);
+		                            }
+		                        }
+		                    }
+			      }
+			      else
+			      {
+				close(i); // bye!
+                        	FD_CLR(i, &master); // remove from master set
+                        	--clients;		//Decrement number of clients connected
+				perror("User had same name!");
+			      }
 
 
                         }
