@@ -34,6 +34,7 @@ int main(void)
     char outbyte;
     char length;
     unsigned short msglength;
+    char tmpname[MAX_NAME];
 
     /* Declare shared memory variables */
     key_t key; 
@@ -164,9 +165,9 @@ int main(void)
 			//Nullify UserName
 			(*usernames)[i-listener-1][0] = 0; 
 			--clients;		//Decrement number of clients connected
+			//Todo Disconnect Message
 
                     } else {
-			printf("Data Handling");
                         // we got some data from a client
 			if((*usernames)[i-listener-1][0] == 0){			//Username Message	
 
@@ -188,17 +189,51 @@ int main(void)
 				}
 				printf("Stored in  array %d\n" , newfd-listener - 1);		
 				++clients;				//Increment number of clients connected
+				//TODO Connect Message
 			}
 			else{							//Chat Message
-				//TODO Handle Client messages
+				//Receive Message Length
+				if(my_recv(i, buf+1, 1, 0) != 1){
+					perror("Could not recieve the rest of messagelength!");
+				}
+				msglength = (buf[1] << 8) | buf[0];
+				msglength = ntohs(msglength);
+				printf("MessageLength : %d\n", msglength);
+				
+				//Receive Message
+				if(my_recv(i, buf, msglength, 0) != msglength){
+					perror("Could not receive chat message!");
+				}
+				//Forward to all clients						
 				for(j = 0; j <= fdmax; j++) {
-		                    // send to everyone!
-		                    if (FD_ISSET(j, &master)) {
-		                        // except the listener and ourselves
-		                        if (j != listener && j != i) {
-		                            if (send(j, buf, nbytes, 0) == -1) {
-		                                perror("send");
+		                    // send if name has been selected
+		                    if (FD_ISSET(j, &master) && (*usernames)[i-listener-1][0] != 0) {
+		                        // except the listener
+		                        if (j != listener) {
+
+					    //Send Message Code
+					    outbyte = CHAT_MSG;
+		                            if (my_send(j, &outbyte, sizeof(outbyte), 0) != sizeof(outbyte)) {
+		                                printf("Chat message code not sent to FD %d", j);
 		                            }
+					    //Send Client info
+					    length = (*usernames)[i-listener-1][0];
+					    for(k = 0; k <= ((int)length) + 1; ++k){
+							tmpname[k] = (*usernames)[i-listener-1][k];
+					    }
+					    if(my_send(j, tmpname, ((int)length) + 1, 0) != ((int)length) + 1){
+						 printf("Client info not sent to FD %d", j);
+					    }
+					    //Send Message Length
+					    unsigned short tmp = htons(msglength);
+					    if (my_send(j, &tmp, sizeof(tmp), 0) != sizeof(tmp)) {
+		                                 printf("Chat message length not sent to FD %d", j);
+		                            }
+					    //Send Message
+					    if (my_send(j, buf, msglength, 0) != msglength) {
+		                                 printf("Chat message not sent to FD %d", j);
+		                            }
+					
 		                        }
 		                    }
 		                }
