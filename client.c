@@ -149,17 +149,17 @@ int main()
 
         while(1)
         {
-            // Get message type
+            //Get message type
             my_recv(s, &msg_type, 1, 0);
 
             if (msg_type == CHAT_MSG)
             {
-                // Get username
+                //Get username
                 my_recv(s, &length, sizeof(length), 0);     
                 my_recv(s, msg_username, (int) length, 0);
 		msg_username[(int) length] = '\0';
 
-                // Get message
+                //Get message
                 my_recv(s, &convert, sizeof(convert), 0);     
 		convert = ntohs(convert);
                 my_recv(s, msgbuf, convert, 0);
@@ -167,15 +167,24 @@ int main()
                 printf("%s:%s\n", msg_username, msgbuf);
             }
 
-
             else if (msg_type == JOIN_MSG)
             {
-                //incomplete
+		//Get username
+                my_recv(s, &length, sizeof(length), 0);     
+                my_recv(s, msg_username, (int) length, 0);
+		msg_username[(int) length] = '\0';
+
+		printf("%s has connected\n",msg_username);
             }
 
             else if (msg_type == LEAVE_MSG)
             {
-                //incomplete
+                //Get username
+                my_recv(s, &length, sizeof(length), 0);     
+                my_recv(s, msg_username, (int) length, 0);
+		msg_username[(int) length] = '\0';
+
+		printf("%s has disconnected\n",msg_username);
             }
 
             sleep(1);

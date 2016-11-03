@@ -162,11 +162,38 @@ int main(void)
                         }
                         close(i); // bye!
                         FD_CLR(i, &master); // remove from master set
+		
+			--clients;		//Decrement number of clients connected
+		
 			
+			//Put name in buffer			
+			length = (*usernames)[i-listener-1][0];
+			for(k = 1; k <= (int)length; ++k){
+				buf[k-1] = (*usernames)[i-listener - 1][k];
+			}
+
 			//Nullify UserName
 			(*usernames)[i-listener-1][0] = 0; 
-			--clients;		//Decrement number of clients connected
-			//Todo Disconnect Message
+			
+			outbyte = LEAVE_MSG;
+
+			//Forward disconnection to all clients						
+			for(j = listener + 1; j <= fdmax; j++) {
+	                    	// send if name has been set
+	                    	if (FD_ISSET(j, &master) && (*usernames)[i-listener-1][0] != 0) {
+
+					//Send User Update Message: Leave
+					if(my_send(j, &outbyte, 1, 0) != 1){
+						printf("Could not send disconnection message to %d\n", j);
+					}
+					if(my_send(j, &length, 1, 0) != 1){
+						printf("Could not send disconnection length to %d\n", j);
+					}
+					if(my_send(j, buf, (int)length, 0) != (int) length){
+						printf("Could not send disconnection username to %d\n", j);
+					}
+				}
+			}
 
                     } else {
                         // we got some data from a client
@@ -188,9 +215,30 @@ int main(void)
 					(*usernames)[i-listener - 1][k] = buf[k-1];
 					printf("%c",buf[k-1]);
 				}
-				printf("Stored in  array %d\n" , newfd-listener - 1);		
+				printf("Stored in array %d\n" , newfd-listener - 1);		
 				++clients;				//Increment number of clients connected
-				//TODO Connect Message
+
+				outbyte = JOIN_MSG;
+				
+				//Forward new connection to all clients						
+				for(j = listener + 1; j <= fdmax; j++) {
+		                    	// send if name has been set
+		                    	if (FD_ISSET(j, &master) && (*usernames)[i-listener-1][0] != 0) {
+
+						//Send User Update Message: Join
+						if(my_send(j, &outbyte, 1, 0) != 1){
+							printf("Could not send connection message to %d\n", j);
+						}
+						if(my_send(j, &length, 1, 0) != 1){
+							printf("Could not send connection length to %d\n", j);
+						}
+						if(my_send(j, buf, (int)length, 0) != (int) length){
+							printf("Could not send connection username to %d\n", j);
+						}
+					}
+				}
+				
+				
 			}
 			else{							//Chat Message
 				//Receive Message Length
@@ -213,12 +261,12 @@ int main(void)
 
 				//Forward to all clients						
 				for(j = listener + 1; j <= fdmax; j++) {
-		                    // send if name has been selected
+		                    // send if name has been set
 		                    if (FD_ISSET(j, &master) && (*usernames)[i-listener-1][0] != 0) {
 					    //Send Message Code
 					    outbyte = CHAT_MSG;
 			                    if (my_send(j, &outbyte, sizeof(outbyte), 0) != sizeof(outbyte)) {
-			                        printf("Chat message code not sent to FD %d", j);
+			                        printf("Chat message code not sent to FD %d\n", j);
 			                    }
 					    //Send Client info
 					    length = (*usernames)[i-listener-1][0];
@@ -226,16 +274,16 @@ int main(void)
 							tmpname[k] = (*usernames)[i-listener-1][k];
 					    }
 					    if(my_send(j, tmpname, ((int)length) + 1, 0) != ((int)length) + 1){
-						 printf("Client info not sent to FD %d", j);
+						 printf("Client info not sent to FD %d\n", j);
 					    }
 					    //Send Message Length
 					    unsigned short tmp = htons(msglength);
 					    if (my_send(j, &tmp, sizeof(tmp), 0) != sizeof(tmp)) {
-			                         printf("Chat message length not sent to FD %d", j);
+			                         printf("Chat message length not sent to FD %d\n", j);
 			                    }
 					    //Send Message
 					    if (my_send(j, buf, msglength, 0) != msglength) {
-			                         printf("Chat message not sent to FD %d", j);
+			                         printf("Chat message not sent to FD %d\n", j);
 			                    }
 		                    }
 		                }
