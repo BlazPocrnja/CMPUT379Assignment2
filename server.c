@@ -46,9 +46,6 @@ int main(int argc, char *argv[])
       exit(0);
     }
 
-    //Print process ID for reference
-    printf("PID: %d", getpid());
-
     fd_set master;    // master file descriptor list
     fd_set read_fds;  // temp file descriptor list for select()
     int fdmax;        // maximum file descriptor number
@@ -70,7 +67,6 @@ int main(int argc, char *argv[])
 
     unsigned short clients = 0;
     unsigned short outnum;
-    int pid;
     char outbyte;
     char length;
     unsigned short msglength;
@@ -82,16 +78,11 @@ int main(int argc, char *argv[])
     time_t activitytime[FD_SETSIZE] = {0}; 
     time_t current = 0;
 
+    pid_t pid = 0;
+    pid_t sid = 0;
+
     //Log File Data
     char filename[32];
-    snprintf(filename, sizeof(char) * 32, "server379%d.log", getpid());
-
-    flog = fopen(filename, "w");
-    if (flog == NULL)
-	{
-	    printf("Error opening log file!\n");
-	    exit(1);
-    }
 
     //Setting up signal handler for SIGTSTP
 	struct sigaction sigtstp_act;
@@ -134,6 +125,51 @@ int main(int argc, char *argv[])
     {
         fprintf(flog, "shmat [%s]\n", strerror(errno));
     }
+
+    //Create Daemon
+    pid = fork();
+
+    if (pid < 0)
+    {
+        printf("fork failed!\n");
+        exit(1);
+    }
+
+    if (pid > 0)
+    {
+    	// in the parent
+       printf("pid of child process %d \n", pid);
+       exit(0); 
+    }
+
+    //Print process ID for reference
+    printf("Daemon PID: %d\n", getpid());
+
+    umask(0);
+
+	// open a log file
+    snprintf(filename, sizeof(char) * 32, "server379%d.log", getpid());
+
+    flog = fopen(filename, "w");
+    if (flog == NULL)
+	{
+	    printf("Error opening log file!\n");
+	    exit(1);
+    }
+    
+    // create new process group -- don't want to look like an orphan
+    sid = setsid();
+    if(sid < 0)
+    {
+    	fprintf(flog, "cannot create new process group");
+        exit(1);
+    }
+    
+    /* Change the current working directory */ 
+    if ((chdir("/")) < 0) {
+      printf("Could not change working directory to /\n");
+      exit(1);
+    }		
 
     listener = socket(AF_INET, SOCK_STREAM, 0);
 
