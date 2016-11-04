@@ -37,6 +37,13 @@ int main(void)
     char tmpname[MAX_NAME];
     typedef enum { false, true } bool;
 
+    struct timeval tv;      
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+
+    time_t activitytime[FD_SETSIZE] = {0}; 
+    time_t current = 0;
+
     /* Declare shared memory variables */
     key_t key;
     int shmid;
@@ -87,15 +94,34 @@ int main(void)
     {
         read_fds = master; // copy it
 
-        if (select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1)
+        if (select(fdmax+1, &read_fds, NULL, NULL, &tv) == -1)
         {
             perror("select");
             exit(-1);
         }
 
+        //Update Current Time
+        current = time(NULL);
+
         // run through the existing connections looking for data to read
         for(i = 0; i <= fdmax; i++)
         {
+
+            if(i > listener)
+            {
+                if((*usernames)[i-listener-1][0] != 0 && (difftime(current,activitytime[i-listener-1]) >= 30))
+                {
+                    close(i);                   // bye!
+                    FD_CLR(i, &master);         //remove from master set
+                    FD_CLR(i, &read_fds);       //remove from read set
+                    --clients;                  //Decrement number of clients connected
+                    (*usernames)[i-listener-1][0] = 0; //Nullify username
+                    //TODO Send Disconnect Message
+                    printf("%d Timed Out\n", i);
+                    continue;
+                }
+            }
+
             if (FD_ISSET(i, &read_fds))   // we got one!!
             {
                 if (i == listener)
@@ -180,8 +206,6 @@ int main(void)
                 }
                 else
                 {
-                    //TODO FORK DATA HANDLING!!
-
                     //handle data from a client
 
                     //Check if connection closed
@@ -205,6 +229,7 @@ int main(void)
 
                         //Save length
                         length = (*usernames)[i-listener-1][0];
+
                         //Nullify UserName
                         (*usernames)[i-listener-1][0] = 0;
 
@@ -263,7 +288,7 @@ int main(void)
             			    {
             			    	if(length == (*usernames)[j][0])
             				    {
-                					for(k = 1; k < (int) length; ++k)
+                					for(k = 1; k <= (int) length; ++k)
                 					{
                 						if(buf[k-1] != (*usernames)[j][k])
                 						{
@@ -291,8 +316,7 @@ int main(void)
     		                        (*usernames)[i-listener - 1][k] = buf[k-1];
     		                        printf("%c",buf[k-1]);
     		                    }
-
-    		                    printf("Stored in array %d\n", newfd-listener - 1);
+    		                    printf(" stored in array %d\n", i-listener - 1);
     		                    ++clients;				//Increment number of clients connected
 
     		                    outbyte = JOIN_MSG;
@@ -402,6 +426,13 @@ int main(void)
                             }
                         }
                     }
+
+                    //Record Activity Time
+                    if(i > listener)
+                    {
+                        activitytime[i-listener-1] = time(NULL);
+                    }
+
                 } // END handle data from client
             } // END got new incoming connection
         } // END looping through file descriptors
