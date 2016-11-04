@@ -161,7 +161,12 @@ int main()
         while(1)
         {
             //Get message type
-            my_recv(s, &msg_type, 1, 0);
+            if(my_recv(s, &msg_type, 1, 0) <= 0){
+            	//Close all processes
+            	close(s);
+            	kill(getppid(), SIGTERM);
+            	exit(0);
+            }
 
             if (msg_type == CHAT_MSG)
             {

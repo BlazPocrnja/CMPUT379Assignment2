@@ -182,7 +182,7 @@ int main(void)
                 {
                     //TODO FORK DATA HANDLING!!
 
-                    // handle data from a client
+                    //handle data from a client
 
                     //Check if connection closed
                     if ((nbytes = my_recv(i, buf, 1, 0)) <= 0)
@@ -200,7 +200,6 @@ int main(void)
 
                         close(i); // bye!
                         FD_CLR(i, &master); // remove from master set
-
                         --clients;		//Decrement number of clients connected
 
 
@@ -259,76 +258,76 @@ int main(void)
                             }
 			    
                             //Check if Username already exists
-			    bool exists = false;
-			    for(j = 0; j <= fdmax - listener - 1; ++j)
-			    {
-			    	if(length == (*usernames)[j][0])
-				{
-					for(k = 1; k < (int) length; ++k)
-					{
-						if(buf[k-1] != (*usernames)[j][k])
-						{
-							exists = false;
-							break;
-						}
-						else
-						{
-							exists = true;
-						}
-								
-					}
-				}
-				if(exists == true) break;
-			    }
+            			    bool exists = false;
+            			    for(j = 0; j <= fdmax - listener - 1; ++j)
+            			    {
+            			    	if(length == (*usernames)[j][0])
+            				    {
+                					for(k = 1; k < (int) length; ++k)
+                					{
+                						if(buf[k-1] != (*usernames)[j][k])
+                						{
+                							exists = false;
+                							break;
+                						}
+                						else
+                						{
+                							exists = true;
+                						}
+                								
+                					}
+            				    }
+
+            				    if(exists == true) break;
+            			    }
 				
-			    if(!exists)
-			    {
-		                    //Store in usernames array
-		                    (*usernames)[i-listener - 1][0] = length;
+            			    if(!exists)
+            			    {
+    		                    //Store in usernames array
+    		                    (*usernames)[i-listener - 1][0] = length;
 
-		                    for(k = 1; k <= (int)length; ++k)
-		                    {
-		                        (*usernames)[i-listener - 1][k] = buf[k-1];
-		                        printf("%c",buf[k-1]);
-		                    }
+    		                    for(k = 1; k <= (int)length; ++k)
+    		                    {
+    		                        (*usernames)[i-listener - 1][k] = buf[k-1];
+    		                        printf("%c",buf[k-1]);
+    		                    }
 
-		                    printf("Stored in array %d\n", newfd-listener - 1);
-		                    ++clients;				//Increment number of clients connected
+    		                    printf("Stored in array %d\n", newfd-listener - 1);
+    		                    ++clients;				//Increment number of clients connected
 
-		                    outbyte = JOIN_MSG;
+    		                    outbyte = JOIN_MSG;
 
-		                    //Forward new connection to all clients
-		                    for(j = listener + 1; j <= fdmax; j++)
-		                    {
-		                        // send if name has been set
-		                        if (FD_ISSET(j, &master) && (*usernames)[j-listener-1][0] != 0)
-		                        {
+    		                    //Forward new connection to all clients
+    		                    for(j = listener + 1; j <= fdmax; j++)
+    		                    {
+    		                        // send if name has been set
+    		                        if (FD_ISSET(j, &master) && (*usernames)[j-listener-1][0] != 0)
+    		                        {
 
-		                            //Send User Update Message: Join
-		                            if(my_send(j, &outbyte, 1, 0) != 1)
-		                            {
-		                                printf("Could not send connection message to %d\n", j);
-		                            }
+    		                            //Send User Update Message: Join
+    		                            if(my_send(j, &outbyte, 1, 0) != 1)
+    		                            {
+    		                                printf("Could not send connection message to %d\n", j);
+    		                            }
 
-		                            if(my_send(j, &length, 1, 0) != 1)
-		                            {
-		                                printf("Could not send connection length to %d\n", j);
-		                            }
+    		                            if(my_send(j, &length, 1, 0) != 1)
+    		                            {
+    		                                printf("Could not send connection length to %d\n", j);
+    		                            }
 
-		                            if(my_send(j, buf, (int)length, 0) != (int) length)
-		                            {
-		                                printf("Could not send connection username to %d\n", j);
-		                            }
-		                        }
-		                    }
-			      }
-			      else
-			      {
-				close(i); // bye!
-                        	FD_CLR(i, &master); // remove from master set
-                        	--clients;		//Decrement number of clients connected
-				perror("User had same name!");
-			      }
+    		                            if(my_send(j, buf, (int)length, 0) != (int) length)
+    		                            {
+    		                                printf("Could not send connection username to %d\n", j);
+    		                            }
+    		                        }
+    		                    }
+                            }
+                            else
+                            {
+    				            close(i); // bye!
+                            	FD_CLR(i, &master); // remove from master set
+    				            perror("Username not unique!\n");
+                            }
 
 
                         }
