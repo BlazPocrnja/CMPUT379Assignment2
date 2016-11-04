@@ -7,7 +7,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include<signal.h>
+#include <signal.h>
 #include <sys/shm.h>
 #include <semaphore.h>
 #include <time.h>
@@ -24,6 +24,8 @@
 #define CHAT_MSG 0x00
 #define JOIN_MSG 0x01
 #define LEAVE_MSG 0x02
+
+#define TIMEOUT 30
 
 
 ssize_t my_send(int sockfd, const void *buf, size_t len, int flags){

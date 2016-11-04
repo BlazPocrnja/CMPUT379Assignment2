@@ -14,9 +14,7 @@ int main()
     unsigned short clients;
     unsigned short msglength;
     char length;
-
-    struct timeval tv;
-    tv.tv_sec = 30;
+    pid_t chid;
 
     fd_set readfds;
     FD_ZERO(&readfds);
@@ -53,20 +51,24 @@ int main()
         exit (1);
     }
 
-    //we don't have to reorder bytes since we're recieving single byte array
-    if(my_recv(s, handbuf, sizeof(handbuf), 0) < 0)
+    //Get handshake bytes
+    if(my_recv(s, handbuf, sizeof(handbuf), 0) != sizeof(handbuf))
     {
         perror ("Client: cannot receive handshake");
     }
 
-    printf("0x%x 0x%x\n", handbuf[0], handbuf[1]);
-
-    if(my_recv(s, &clients, sizeof(clients), 0) < 0)
+    if(my_recv(s, &clients, sizeof(clients), 0) != sizeof(clients))
     {
         perror ("Client: cannot receive number of clients");
     }
+
     clients = ntohs(clients);
-    printf("Clients: %d\n", clients);
+    printf("\n%d user(s) online\n", clients);
+
+    if(clients > 0)
+    {
+    	printf("--------------------------------------------------------\n");
+    }
 
     //Receive list of usernames
     for(i=0; i < clients; ++i)
@@ -75,7 +77,7 @@ int main()
         {
             perror ("Client: cannot receive length");
         }
-        printf("Length: %d ", length);
+
         char name[(int)length];
 
         if(my_recv(s, &name, (int)length, 0) < 0)
@@ -83,80 +85,98 @@ int main()
             perror ("Client: cannot receive Username");
         }
 
-        printf("Username: ");
         for(j = 0 ; j < (int)length; ++j)
         {
             printf("%c",name[j]);
         }
         printf("\n");
+    }
 
+    if(clients > 0)
+    {
+    	printf("--------------------------------------------------------\n");
     }
 
     //Send new username
     i= 0;
-    printf("Enter a unique username: ");
+    printf("\nEnter a unique username: ");
     while((namebuf[i] = getchar()) != '\n' && namebuf[i] != EOF)
     {
         ++i;
         if(i == MAX_NAME - 1) break;
     }
 
-    printf("Username: ");
-    for(j = 0 ; j < i; ++j)
-    {
-        printf("%c",namebuf[j]);
-    }
-    printf("\n");
-
     length = (char)i;
 
     my_send(s, &length, sizeof(length), 0);
     my_send(s, namebuf, (int)length, 0);
 
-    printf("Chat Away...\n");
+    printf("\n");
 
-    pid_t chid;
+    chid = fork(); //Fork to have two loops, one for sending messages, one for receiving.
 
-    chid = fork(); // Fork to have two loops, one for sending messages, one for receiving.
-
-    if (chid != 0) //Executed by parent
+    if(chid == -1)	//Fork Error
+    {	
+    	//Let process terminate to end
+    	perror("Fork Error");
+    }
+    if (chid > 0) //Executed by parent
     {
+    	fd_set readfds;
+    	FD_ZERO(&readfds);
+    	FD_SET(STDIN, &readfds);
+
+    	struct timeval tv;
+
         while(1)
         {
-            i = 0;
-            while((msgbuf[i] = getchar()) != '\n' && msgbuf[i] != EOF)
-            {
-                ++i;
-                if(i == MAX_MSG - 1) break;
-            }
+        	tv.tv_sec = TIMEOUT - 5;			//TIMEOUT-5 to be safe
+    		tv.tv_usec = 0;
+        	if(select(STDIN + 1, &readfds, NULL, NULL, &tv) == -1)
+        	{
+            	perror("select");
+            	exit(-1);
+        	}
 
-            msglength = (short)i;
-            msglength = htons(msglength);
-            my_send(s, &msglength, sizeof(msglength), 0);
+        	if (FD_ISSET(STDIN, &readfds)){
+        		//Something to read
+	            i = 0;
+	            while((msgbuf[i] = getchar()) != '\n' && msgbuf[i] != EOF)
+	            {
+	                ++i;
+	                if(i == MAX_MSG - 1) break;
+	            }
 
-            printf("Message: ");
-            for(j = 0 ; j < i; ++j)
-            {
-                printf("%c",msgbuf[j]);
-            }
-            printf("\n");
+	            //Send Message Length
+	            msglength = (short)i;
+	            msglength = htons(msglength);
+	            my_send(s, &msglength, sizeof(msglength), 0);
 
-            msglength = ntohs(msglength);
-            my_send(s, msgbuf, msglength, 0);
+	            //Send Message Contents
+	            msglength = ntohs(msglength);
+	            my_send(s, msgbuf, msglength, 0);
+	        }
+	        else
+	        {
+	        	//Send Timeout Message
+	        	msglength = 0;
+	            msglength = htons(msglength);
+	            if(my_send(s, &msglength, sizeof(msglength), 0) != sizeof(msglength)){
+	            	printf("Timeout Message Not Sent!");
+	            }
 
+	        }
         }
     }
 
-    char msg_type;
-    uint16_t msg_userlength;
-    unsigned short convert; // convert as storage for ntos()
-    char msg_username[MAX_NAME];
-    uint16_t msg_msglength;
-    char msg_msg[100];
-
-    if (chid == 0)
+    if (chid == 0)	//Executed by child
     {
-        printf("Working\n");
+    	char msg_type;
+    	uint16_t msg_userlength;
+    	unsigned short convert; // convert as storage for ntos()
+    	char msg_username[MAX_NAME];
+    	uint16_t msg_msglength;
+    	char msg_msg[100];
 
         while(1)
         {
@@ -180,7 +200,7 @@ int main()
                 convert = ntohs(convert);
                 my_recv(s, msgbuf, convert, 0);
                 msgbuf[convert] = '\0';
-                printf("%s:%s\n", msg_username, msgbuf);
+                printf("<%s> %s\n", msg_username, msgbuf);
             }
 
             else if (msg_type == JOIN_MSG)
@@ -190,7 +210,7 @@ int main()
                 my_recv(s, msg_username, (int) length, 0);
                 msg_username[(int) length] = '\0';
 
-                printf("%s has connected\n",msg_username);
+                printf("** %s has connected to the server **\n",msg_username);
             }
 
             else if (msg_type == LEAVE_MSG)
@@ -200,7 +220,7 @@ int main()
                 my_recv(s, msg_username, (int) length, 0);
                 msg_username[(int) length] = '\0';
 
-                printf("%s has disconnected\n",msg_username);
+                printf("** %s has disconnected to the server **\n",msg_username);
             }
         }
 
