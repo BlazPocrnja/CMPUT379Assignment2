@@ -12,6 +12,7 @@
 #include <semaphore.h>
 #include <time.h>
 #include <sys/time.h>
+ #include <errno.h>
 
 #define MY_PORT 2222   // port we're listening on
 #define MAX_NAME 30   // maximum length of a username

@@ -4,9 +4,26 @@
  This is a sample client program for the number server. The client and
  the server need not run on the same machine.
  --------------------------------------------------------------------- */
-
-int main()
+ 
+int main(int argc, char *argv[])
 {
+    if( argc < 4 ) 
+    {
+      printf("Too few arguments supplied.\n");
+      exit(0);
+    }
+    else if( argc > 4 ) 
+    {
+      printf("Too many arguments supplied.\n");
+      exit(0);
+    }
+
+    if(strlen(argv[3]) >= MAX_NAME)
+    {
+        printf("Username too long!\n");
+        exit(0);
+    }
+    
     int	s, i, j;
     unsigned char handbuf[2] = {0};
     unsigned char namebuf[MAX_NAME];
@@ -22,16 +39,6 @@ int main()
 
     struct	sockaddr_in	server;
 
-    struct	hostent		*host;
-
-    host = gethostbyname ("localhost");	//TODO change from local host to server address
-
-    if (host == NULL)
-    {
-        perror ("Client: cannot get host description");
-        exit (1);
-    }
-
     s = socket (AF_INET, SOCK_STREAM, 0);
 
     if (s < 0)
@@ -40,10 +47,9 @@ int main()
         exit (1);
     }
 
-    bzero (&server, sizeof (server));
-    bcopy (host->h_addr, & (server.sin_addr), host->h_length);
-    server.sin_family = host->h_addrtype;
-    server.sin_port = htons (MY_PORT);
+    server.sin_addr.s_addr = inet_addr(argv[1]);
+    server.sin_family = AF_INET;
+    server.sin_port = htons(atoi(argv[2]));
 
     if (connect (s, (struct sockaddr*) & server, sizeof (server)))
     {
@@ -98,18 +104,9 @@ int main()
     }
 
     //Send new username
-    i= 0;
-    printf("\nEnter a unique username: ");
-    while((namebuf[i] = getchar()) != '\n' && namebuf[i] != EOF)
-    {
-        ++i;
-        if(i == MAX_NAME - 1) break;
-    }
-
-    length = (char)i;
-
+    length = (char)strlen(argv[3]);
     my_send(s, &length, sizeof(length), 0);
-    my_send(s, namebuf, (int)length, 0);
+    my_send(s, &argv[3][0], (int)length, 0);
 
     printf("\n");
 
@@ -183,6 +180,7 @@ int main()
             //Get message type
             if(my_recv(s, &msg_type, 1, 0) <= 0){
             	//Close all processes
+                printf("Diconnected from server.\n");
             	close(s);
             	kill(getppid(), SIGTERM);
             	exit(0);

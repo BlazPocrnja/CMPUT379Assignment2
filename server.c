@@ -7,8 +7,48 @@
 
 #include "chat.h"
 
-int main(void)
+int file_number = 0;
+FILE *flog = NULL;
+
+void sigtstp_handler(int signo) {
+    fprintf(flog,"SIGTSTP received.\n");
+    //printf("SIGTSTP received.\n");
+	fclose(flog);
+	return;
+}
+
+void sigint_handler(int signo){
+    fprintf(flog,"SIGINT received.\n");
+    //printf("SIGTINT received.\n");
+	fclose(flog);
+	exit(0);
+}
+
+void sigterm_handler(int signum)
 {
+    fprintf(flog,"SIGTERM received.\n");
+    //printf("SIGTERM received.\n");
+	fclose(flog);
+	exit(0);
+}
+
+
+int main(int argc, char *argv[])
+{
+    if( argc < 2 ) 
+    {
+      printf("Too few arguments supplied.\n");
+      exit(0);
+    }
+    else if( argc > 2 ) 
+    {
+      printf("Too many arguments supplied.\n");
+      exit(0);
+    }
+
+    //Print process ID for reference
+    printf("PID: %d", getpid());
+
     fd_set master;    // master file descriptor list
     fd_set read_fds;  // temp file descriptor list for select()
     int fdmax;        // maximum file descriptor number
@@ -42,6 +82,41 @@ int main(void)
     time_t activitytime[FD_SETSIZE] = {0}; 
     time_t current = 0;
 
+    //Log File Data
+    char filename[32];
+    snprintf(filename, sizeof(char) * 32, "server379%d.log", getpid());
+
+    flog = fopen(filename, "w");
+    if (flog == NULL)
+	{
+	    printf("Error opening log file!\n");
+	    exit(1);
+    }
+
+    //Setting up signal handler for SIGTSTP
+	struct sigaction sigtstp_act;
+	//reset flags -- fixes seg fault
+	sigtstp_act.sa_flags = 0;
+	sigtstp_act.sa_handler = sigtstp_handler;
+	sigemptyset(&sigtstp_act.sa_mask);
+	sigaction(SIGTSTP, &sigtstp_act, NULL);
+
+	//Setting up signal handler for SIGINT
+	struct sigaction sigint_act;
+	//reset flags -- fixes seg fault
+	sigint_act.sa_flags = 0;
+	sigint_act.sa_handler = sigint_handler;
+	sigemptyset(&sigint_act.sa_mask);
+    sigaction(SIGINT, &sigint_act, NULL);
+
+    //Setting up signal handler for SIGTERM
+	struct sigaction sigterm_act;
+	//reset flags -- fixes seg fault
+	sigterm_act.sa_flags = 0;
+	sigterm_act.sa_handler = sigterm_handler;
+	sigemptyset(&sigterm_act.sa_mask);
+    sigaction(SIGTERM, &sigterm_act, NULL);
+
     /* Declare shared memory variables */
     key_t key;
     int shmid;
@@ -57,7 +132,7 @@ int main(void)
 
     if(usernames == (name *)(-1))
     {
-        perror("shmat");
+        fprintf(flog, "shmat [%s]\n", strerror(errno));
     }
 
     listener = socket(AF_INET, SOCK_STREAM, 0);
@@ -66,18 +141,18 @@ int main(void)
     memset(&sa, 0, sizeof sa);
     sa.sin_family = AF_INET;
     sa.sin_addr.s_addr = INADDR_ANY;
-    sa.sin_port = htons(MY_PORT);
+    sa.sin_port = htons(atoi(argv[1]));
 
     if (bind(listener, (struct sockaddr *)&sa, sizeof(sa)) < 0)
     {
-        perror("bind");
+        fprintf(flog, "bind [%s]\n", strerror(errno));
         exit(-1);
     }
 
     // listen
     if (listen(listener, 10) == -1)
     {
-        perror("listen");
+        fprintf(flog, "listen [%s]\n", strerror(errno));
         exit(-1);
     }
 
@@ -98,7 +173,7 @@ int main(void)
 
         if (select(fdmax+1, &read_fds, NULL, NULL, &tv) == -1)
         {
-            perror("select");
+            fprintf(flog, "select [%s]\n", strerror(errno));
             exit(-1);
         }
 
@@ -109,6 +184,7 @@ int main(void)
         for(i = 0; i <= fdmax; i++)
         {
 
+            //CHECK IF TIMED OUT
             if(i > listener)
             {
                 if((*usernames)[i-listener-1][0] != 0 && (difftime(current,activitytime[i-listener-1]) >= TIMEOUT))
@@ -118,8 +194,45 @@ int main(void)
                     FD_CLR(i, &read_fds);       //remove from read set
                     --clients;                  //Decrement number of clients connected
                     (*usernames)[i-listener-1][0] = 0; //Nullify username
-                    //TODO Send Disconnect Message
-                    printf("%d Timed Out\n", i);
+
+                    //Save length
+                    length = (*usernames)[i-listener-1][0];
+
+                    //Put username in buffer
+                    for(k = 1; k <= (int)length; ++k)
+                    {
+                        buf[k-1] = (*usernames)[i-listener - 1][k];
+                    }
+
+                    outbyte = LEAVE_MSG;
+
+                    //Forward disconnection to all clients
+                    for(j = listener + 1; j <= fdmax; j++)
+                    {
+                        // send if name has been set
+                        if (FD_ISSET(j, &master) && (*usernames)[j-listener-1][0] != 0)
+                        {
+
+                            //Send User Update Message: Leave
+                            if(my_send(j, &outbyte, 1, 0) != 1)
+                            {
+                                fprintf(flog, "Could not send disconnection message to socket %d [%s]\n", j, strerror(errno));
+                            }
+
+                            if(my_send(j, &length, 1, 0) != 1)
+                            {
+                                fprintf(flog, "Could not send disconnection length to socket %d [%s]\n", j, strerror(errno));
+                            }
+
+                            if(my_send(j, buf, (int)length, 0) != (int) length)
+                            {
+                                fprintf(flog, "Could not send disconnection username to socket %d [%s]\n", j, strerror(errno));
+                            }
+                        }
+                    }
+
+
+                    fprintf(flog, "Socket %d Timed Out [%s]\n",i, strerror(errno));
                     continue;
                 }
             }
@@ -134,7 +247,7 @@ int main(void)
 
                     if (newfd == -1)
                     {
-                        perror("accept");
+                        fprintf(flog, "accept [%s]\n", strerror(errno));
                     }
                     else
                     {
@@ -146,8 +259,8 @@ int main(void)
                             fdmax = newfd;
                         }
 
-                        printf("selectserver: new connection from %s:%d on socket %d\n",
-                               inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd);
+                        fprintf(flog, "new connection from %s:%d on socket %d [%s]\n",
+                               inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd, strerror(errno));
 
                         //---------HANDSHAKE PROTOCOL------------
 
@@ -157,7 +270,7 @@ int main(void)
 
                         if(my_send(newfd, buf, 2, 0) != 2)
                         {
-                            perror("Handshake Bytes not sent!");
+                            fprintf(flog, "Handshake Not Sent [%s]\n", strerror(errno));
                         }
 
                         //Number of Clients
@@ -165,7 +278,7 @@ int main(void)
 
                         if(my_send(newfd, &outnum, sizeof(outnum), 0) != 2)
                         {
-                            perror("Number of clients not sent!");
+                            fprintf(flog, "Client number not sent [%s]\n", strerror(errno));
                         }
 
                         //Usernames
@@ -181,7 +294,7 @@ int main(void)
 
                                 if(my_send(newfd, &outbyte, sizeof(outbyte), 0) != sizeof(outbyte))
                                 {
-                                    perror("Length of username not sent!");
+                                    fprintf(flog, "Username length not sent [%s]\n", strerror(errno));
                                 }
 
                                 //Send array of chars
@@ -192,7 +305,7 @@ int main(void)
 
                                 if(my_send(newfd, buf, (int)outbyte, 0) != (int) outbyte)
                                 {
-                                    perror("Username not sent!");
+                                    fprintf(flog, "Username not sent [%s]\n", strerror(errno));
                                 }
                             }
                             else
@@ -217,16 +330,21 @@ int main(void)
                         if (nbytes == 0)
                         {
                             // connection closed
-                            printf("selectserver: socket %d hung up\n", i);
+                            fprintf(flog, "socket %d hung up [%s]\n", i, strerror(errno));
+                            
                         }
                         else
                         {
-                            perror("Could not receive initial byte!");
+                            fprintf(flog, "Could not receive initial byte [%s]\n", strerror(errno));
                         }
 
                         close(i); // bye!
                         FD_CLR(i, &master); // remove from master set
-                        --clients;		//Decrement number of clients connected
+
+                        if((*usernames)[i-listener - 1][0] != 0)
+                        {
+                            --clients;		//Decrement number of clients connected
+                        }
 
 
                         //Save length
@@ -253,17 +371,17 @@ int main(void)
                                 //Send User Update Message: Leave
                                 if(my_send(j, &outbyte, 1, 0) != 1)
                                 {
-                                    printf("Could not send disconnection message to %d\n", j);
+                                    fprintf(flog, "Could not send disconnection message to socket %d [%s]\n", j, strerror(errno));
                                 }
 
                                 if(my_send(j, &length, 1, 0) != 1)
                                 {
-                                    printf("Could not send disconnection length to %d\n", j);
+                                    fprintf(flog, "Could not send disconnection length to socket %d [%s]\n", j, strerror(errno));
                                 }
 
                                 if(my_send(j, buf, (int)length, 0) != (int) length)
                                 {
-                                    printf("Could not send disconnection username to %d\n", j);
+                                    fprintf(flog, "Could not send disconnection username to socket %d [%s]\n", j, strerror(errno));
                                 }
                             }
                         }
@@ -281,7 +399,7 @@ int main(void)
                             //Receive New Username Chars
                             if(my_recv(i, buf, (int)length, 0) != (int) length)
                             {
-                                perror("Could not receive new username!");
+                                fprintf(flog, "Could not receive username [%s]\n", strerror(errno));
                             }
 			    
                             //Check if Username already exists
@@ -316,9 +434,9 @@ int main(void)
     		                    for(k = 1; k <= (int)length; ++k)
     		                    {
     		                        (*usernames)[i-listener - 1][k] = buf[k-1];
-    		                        printf("%c",buf[k-1]);
+    		                        fprintf(flog,"%c",buf[k-1]);
     		                    }
-    		                    printf(" stored in array %d\n", i-listener - 1);
+    		                    fprintf(flog," stored in array %d\n", i-listener - 1);
     		                    ++clients;				//Increment number of clients connected
 
     		                    outbyte = JOIN_MSG;
@@ -333,17 +451,17 @@ int main(void)
     		                            //Send User Update Message: Join
     		                            if(my_send(j, &outbyte, 1, 0) != 1)
     		                            {
-    		                                printf("Could not send connection message to %d\n", j);
+    		                                fprintf(flog, "Could not send connection message to socket %d [%s]\n", j, strerror(errno));
     		                            }
 
     		                            if(my_send(j, &length, 1, 0) != 1)
     		                            {
-    		                                printf("Could not send connection length to %d\n", j);
+    		                                fprintf(flog, "Could not send connection length to socket %d [%s]\n", j, strerror(errno));
     		                            }
 
     		                            if(my_send(j, buf, (int)length, 0) != (int) length)
     		                            {
-    		                                printf("Could not send connection username to %d\n", j);
+    		                                fprintf(flog, "Could not send connection username to socket %d [%s]\n", j, strerror(errno));
     		                            }
     		                        }
     		                    }
@@ -352,7 +470,7 @@ int main(void)
                             {
     				            close(i); // bye!
                             	FD_CLR(i, &master); // remove from master set
-    				            perror("Username not unique!\n");
+                                fprintf(flog, "Username not unique [%s]\n", strerror(errno));
                             }
 
 
@@ -362,28 +480,18 @@ int main(void)
                             //Receive Message Length
                             if(my_recv(i, buf+1, 1, 0) != 1)
                             {
-                                perror("Could not recieve the rest of messagelength!");
+                                fprintf(flog, "Could not receive messagelength [%s]\n", strerror(errno));
                             }
 
                             msglength = (buf[1] << 8) | buf[0];
                             msglength = ntohs(msglength);
-                            printf("MessageLength : %d\n", msglength);
 
                             if(msglength > 0){
                                 //Receive Message
                                 if(my_recv(i, buf, msglength, 0) != msglength)
                                 {
-                                    perror("Could not receive chat message!");
+                                    fprintf(flog, "Could not receive chat message [%s]\n", strerror(errno));
                                 }
-
-                                printf("Message :");
-
-                                for(k = 0; k < msglength; ++k)
-                                {
-                                    printf("%c",buf[k]);
-                                }
-
-                                printf("\n");
 
                                 //Forward to all clients
                                 for(j = listener + 1; j <= fdmax; j++)
@@ -396,7 +504,7 @@ int main(void)
 
                                         if (my_send(j, &outbyte, sizeof(outbyte), 0) != sizeof(outbyte))
                                         {
-                                            printf("Chat message code not sent to FD %d\n", j);
+                                            fprintf(flog, "Chat message code not sent to FD %d [%s]\n", j, strerror(errno));
                                         }
 
                                         //Send Client info
@@ -409,7 +517,7 @@ int main(void)
 
                                         if(my_send(j, tmpname, ((int)length) + 1, 0) != ((int)length) + 1)
                                         {
-                                            printf("Client info not sent to FD %d\n", j);
+                                            fprintf(flog, "Client info not sent to FD %d [%s]\n", j, strerror(errno));
                                         }
 
                                         //Send Message Length
@@ -417,13 +525,13 @@ int main(void)
 
                                         if (my_send(j, &tmp, sizeof(tmp), 0) != sizeof(tmp))
                                         {
-                                            printf("Chat message length not sent to FD %d\n", j);
+                                           fprintf(flog, "Chat message length not sent to FD %d [%s]\n", j, strerror(errno));
                                         }
 
                                         //Send Message
                                         if (my_send(j, buf, msglength, 0) != msglength)
                                         {
-                                            printf("Chat message not sent to FD %d\n", j);
+                                            fprintf(flog, "Chat message not sent to FD %d [%s]\n", j, strerror(errno));
                                         }
                                     }
                                 }
