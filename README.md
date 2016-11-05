@@ -1,12 +1,12 @@
-Chat server and client
-
-CMPUT 379 Assignment 2
+###CMPUT 379 Assignment 2
 
 Blaz Pocrnja
 
 Shawn Sydia
 
-##Compile and Run
+Chat server and client
+
+####Compile and Run
 "make"  - Create executables
 
 "make client"   - Create client only
