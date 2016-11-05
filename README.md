@@ -1,5 +1,10 @@
-# CMPUT379Assignment2
 Chat server and client
+
+CMPUT 379 Assignment 2
+
+Blaz Pocrnja
+
+Shawn Sydia
 
 ##Compile and Run
 "make"  - Create executables
