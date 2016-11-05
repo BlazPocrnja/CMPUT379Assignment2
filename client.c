@@ -120,13 +120,14 @@ int main(int argc, char *argv[])
     if (chid > 0) //Executed by parent
     {
     	fd_set readfds;
-    	FD_ZERO(&readfds);
-    	FD_SET(STDIN, &readfds);
 
     	struct timeval tv;
 
         while(1)
         {
+            FD_ZERO(&readfds);
+    	    FD_SET(STDIN, &readfds);
+
         	tv.tv_sec = TIMEOUT - 5;			//TIMEOUT-5 to be safe
     		tv.tv_usec = 0;
         	if(select(STDIN + 1, &readfds, NULL, NULL, &tv) == -1)
